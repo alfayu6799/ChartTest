@@ -7,18 +7,24 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 
+import com.github.mikephil.charting.charts.CandleStickChart;
 import com.github.mikephil.charting.charts.CombinedChart;
 import com.github.mikephil.charting.components.Legend;
+import com.github.mikephil.charting.components.LimitLine;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.BarEntry;
+import com.github.mikephil.charting.data.CandleData;
+import com.github.mikephil.charting.data.CandleDataSet;
+import com.github.mikephil.charting.data.CandleEntry;
 import com.github.mikephil.charting.data.CombinedData;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.formatter.IndexAxisValueFormatter;
+import com.github.mikephil.charting.formatter.ValueFormatter;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -35,6 +41,9 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
 
     private CombinedChart mCombinedChart;
+    private TargetZoneLineChart mTargetChart;
+    private CandleStickChart candleStickChart;
+
     private YAxis leftAxis;
     private YAxis rightAxis;
     private XAxis xAxis;
@@ -44,11 +53,115 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mCombinedChart = findViewById(R.id.chart);
+//        CandleStickChart();
 
-        initChart();
+        initLineChart();
 
-        jsonDate();
+//        initChart();
+
+//        jsonDate();
+    }
+
+    //蠟燭
+    private void CandleStickChart() {
+        candleStickChart = findViewById(R.id.chart);
+
+        String[] months = new String[] {
+                "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"
+        };
+
+        candleStickChart.getDescription().setEnabled(false);
+        candleStickChart.setBackgroundColor(Color.WHITE);
+        candleStickChart.setDrawGridBackground(false);
+
+        Legend l = candleStickChart.getLegend();
+        l.setWordWrapEnabled(true);
+        l.setVerticalAlignment(Legend.LegendVerticalAlignment.BOTTOM);
+        l.setHorizontalAlignment(Legend.LegendHorizontalAlignment.CENTER);
+        l.setOrientation(Legend.LegendOrientation.HORIZONTAL);
+        l.setDrawInside(false);
+
+        YAxis rightAxis = candleStickChart.getAxisRight();
+        rightAxis.setDrawGridLines(false);
+        rightAxis.setAxisMinimum(0f); // this replaces setStartAtZero(true)
+
+        YAxis leftAxis = candleStickChart.getAxisLeft();
+        leftAxis.setDrawGridLines(false);
+        leftAxis.setAxisMinimum(0f); // this replaces setStartAtZero(true)
+
+        XAxis xAxis = candleStickChart.getXAxis();
+        xAxis.setPosition(XAxis.XAxisPosition.BOTH_SIDED);
+        xAxis.setAxisMinimum(0f);
+        xAxis.setGranularity(1f);
+        xAxis.setValueFormatter(new ValueFormatter() {
+            @Override
+            public String getFormattedValue(float value) {
+                return months[(int) value % months.length];
+            }
+        });
+    }
+
+
+    //自訂LineChart
+    private void initLineChart() {
+        mTargetChart = findViewById(R.id.chart);
+
+        ArrayList<String> label = new ArrayList<>();
+        ArrayList<Entry> entries = new ArrayList<>();
+
+        String myJSONStr = loadJSONFromAsset("menstruation_12.json");
+        try {
+            JSONObject obj = new JSONObject(myJSONStr);
+            String status = obj.getString("status");
+            if (status.equals("Success")) {
+                JSONArray array = obj.getJSONArray("data");
+                for(int i = 0; i < array.length(); i++){
+                    JSONObject objdata = array.getJSONObject(i);
+                    String periodDate = objdata.getString("testDate");      //日期(X軸)
+                    String periodDegree = objdata.getString("temperature"); //體溫(Y軸)
+                    double degree = Double.parseDouble(periodDegree);
+
+                    String[] str = periodDate.split("/"); //分割字串
+                    String day = str[2];  //只取日
+
+                    entries.add(new Entry(i, (float) degree));  //Y軸放體溫
+                    label.add(day);  //X軸放日期
+               }
+
+                LineDataSet lineDataSet = new LineDataSet(entries, "");
+                lineDataSet.setColor(Color.RED);
+                LineData data = new LineData(lineDataSet);
+
+                mTargetChart.setData(data);
+
+                xAxis = mTargetChart.getXAxis(); //取得X軸
+                xAxis.setValueFormatter(new IndexAxisValueFormatter(label));
+                xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
+                xAxis.setGranularity(1f);
+                xAxis.setLabelCount(label.size());
+                xAxis.setGridColor(Color.BLACK);
+                xAxis.setGridLineWidth(1f);
+
+                rightAxis = mTargetChart.getAxisRight();
+                rightAxis.setEnabled(false);
+                leftAxis = mTargetChart.getAxisLeft();
+
+                leftAxis.setLabelCount(7);  //體溫
+                xAxis.setLabelCount(10);    //10天為一階
+
+                //體溫微高
+                float rangeHigh = 40f;
+                float rangeLow = 39.5f;
+//
+                mTargetChart.addTargetZone(new TargetZoneLineChart.TargetZone(Color.parseColor("#f5c6cb"),rangeHigh,rangeLow));
+
+                mTargetChart.getLegend().setEnabled(false);
+                mTargetChart.getDescription().setEnabled(false);
+                mTargetChart.invalidate();
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
     }
 
     private void jsonDate() {
@@ -67,10 +180,14 @@ public class MainActivity extends AppCompatActivity {
                     JSONObject objdata = array.getJSONObject(i);
                     String periodDate = objdata.getString("testDate");      //日期(X軸)
                     String periodDegree = objdata.getString("temperature"); //體溫(Y軸)
+                    String periodStatus = objdata.getString("cycleStatus"); //經期
                     String[] str = periodDate.split("/"); //分割字串
                     String day = str[2];  //只取日
+
+                    //數據填入組合圖內(x:日期,Y:體溫)
                     xList.add(day);
                     yList.add(Float.valueOf(periodDegree));
+
                 }
             }
         } catch (JSONException e) {
@@ -114,6 +231,8 @@ public class MainActivity extends AppCompatActivity {
      * 初始化Chart
      */
     private void initChart() {
+        mCombinedChart = findViewById(R.id.chart);
+
         //不顯示描述內容
         mCombinedChart.getDescription().setEnabled(false);
 

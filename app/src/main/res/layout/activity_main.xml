@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <com.github.mikephil.charting.charts.CombinedChart
+    <com.example.charttest.TargetZoneLineChart
         android:id="@+id/chart"
         android:layout_marginTop="10dp"
         android:layout_marginLeft="20dp"
